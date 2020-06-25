@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import *
 
 from cred import API_key
 
+
 # TODO: delete temporal folder when closing app
 # TODO: add refresh button
 # TODO: get a better map style, google offers options
@@ -20,13 +21,26 @@ class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
 
+        self.dir_name = 'temporal'
         self.setWindowTitle('Recent Earthquakes Chile')
 
-        earthquaque_api = requests.get('https://api.gael.cl/general/public/sismos')
-        self.eq_data = earthquaque_api.json()
+        # get info from the most recent earthquakes from api and work whith it as json
+        earthquake_api = requests.get('https://api.gael.cl/general/public/sismos')
+        self.eq_data = earthquake_api.json()
 
-        self.main_layout = QVBoxLayout()
+        # It goes:
+        # central widget
+        #     - main_widget
+        #         - main_layout
+        #             - photo
+        #             - widget
+        #                 -vbox <- layout
+        #                     - scroll
+        #                         -buttons
+        #                             -info
+
         self.main_widget = QWidget()
+        self.main_layout = QVBoxLayout()
 
         self.scroll = QScrollArea()  # Scroll Area which contains the widgets, set as the centralWidget
         self.widget = QWidget()  # Widget that contains the collection of Vertical Box
@@ -46,7 +60,8 @@ class MainWindow(QMainWindow):
 
         for i in range(len(self.info_buttons)):
             self.info_buttons[i].setFixedWidth(350)
-            # self.info_buttons[i].clicked.connect(lambda: self.get_map_image(i)) TODO: maybe figure out why this doesn't work
+            # TODO: maybe figure out why next line doesn't work
+            # self.info_buttons[i].clicked.connect(lambda: self.get_map_image(i))
             self.vbox.addWidget(self.info_buttons[i])
 
         self.vbox.setAlignment(Qt.AlignHCenter)
@@ -58,12 +73,9 @@ class MainWindow(QMainWindow):
         self.scroll.setWidgetResizable(True)
         self.scroll.setWidget(self.widget)
 
-
         self.photo = QLabel()
         self.generate_map_image(self.eq_data[0])
         self.photo.setPixmap(QPixmap('temporal/map-0.png'))
-
-
 
         self.main_layout.addWidget(self.photo)
         self.main_layout.addWidget(self.scroll)
@@ -72,6 +84,9 @@ class MainWindow(QMainWindow):
 
         self.setGeometry(600, 100, 600, 600)
 
+        self.show_image()
+
+    def show_image(self):
         self.info_buttons[0].clicked.connect(lambda: self.get_map_image(0))
         self.info_buttons[1].clicked.connect(lambda: self.get_map_image(1))
         self.info_buttons[2].clicked.connect(lambda: self.get_map_image(2))
@@ -88,21 +103,17 @@ class MainWindow(QMainWindow):
         self.info_buttons[13].clicked.connect(lambda: self.get_map_image(13))
         self.info_buttons[14].clicked.connect(lambda: self.get_map_image(14))
 
-
-
-
     def get_map_image(self, btn_index):
         print(str(self.sender))
         self.generate_map_image(self.eq_data[btn_index])
         self.photo.setPixmap(QPixmap(f'temporal/map-{btn_index}.png'))
 
     def generate_map_image(self, single_eq):
+        """Generate image from google maps static api using geo data from earthquake api"""
         lat = single_eq['Latitud']
         long = single_eq['Longitud']
-        btn_index = self.eq_data.index(single_eq)
-        self.dir_name = 'temporal'
+        btn_index = self.eq_data.index(single_eq)   # gets index of button pressed
         try:
-            # Create target Directory
             os.mkdir(self.dir_name)
             print("Directory ", self.dir_name, " Created ")
         except FileExistsError:
@@ -114,6 +125,7 @@ class MainWindow(QMainWindow):
         else:
             print('file already exists')
 
+    # Examples on getting an image file to show on Mainwindow
     def test_map_1(self):
         self.photo.setPixmap(QPixmap('staticmap.png'))
 
