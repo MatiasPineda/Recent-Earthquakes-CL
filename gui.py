@@ -2,18 +2,18 @@ import os
 import requests
 import sys
 import urllib.request
+import shutil
+import atexit
 
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
-from cred import API_key
+API_key = os.environ['GOOGLE_API_KEY']
 
-
-# TODO: delete temporal folder when closing app
 # TODO: add refresh button
 # TODO: get a better map style, google offers options
-# TODO: style the app e.g.
+# TODO: style the app like: red dot in the middle, bigger map area, road names, etc
 # TODO: Clean!
 
 
@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
         self.dir_name = 'temporal'
         self.setWindowTitle('Recent Earthquakes Chile')
 
-        # get info from the most recent earthquakes from api and work whith it as json
+        # get info from the most recent earthquakes from api and work with it as json
         earthquake_api = requests.get('https://api.gael.cl/general/public/sismos')
         self.eq_data = earthquake_api.json()
 
@@ -44,28 +44,20 @@ class MainWindow(QMainWindow):
 
         self.scroll = QScrollArea()  # Scroll Area which contains the widgets, set as the centralWidget
         self.widget = QWidget()  # Widget that contains the collection of Vertical Box
-        self.vbox = QVBoxLayout()  # The Vertical Box that contains the Horizontal Boxes of  labels and buttons
+        self.v_scroll_layout = QVBoxLayout()  # The Vertical Box that contains the Horizontal Boxes of  labels and buttons
 
-        self.info_buttons = []
+        self.button_group = QButtonGroup()
+        self.button_group.buttonClicked[int].connect(self.on_button_clicked)
+
         for index in range(15):
             data_dict = self.eq_data[index]
             btn_label = f'Fecha: {data_dict["Fecha"]} \nMagnitud: {data_dict["Magnitud"]}'
-            self.info_buttons.append(QPushButton(btn_label))
+            button_object = QPushButton(btn_label)
+            self.button_group.addButton(button_object, index)
+            self.v_scroll_layout.addWidget(button_object)
 
-        # Same process as lines 36-39
-        # for w in self.info_buttons:
-        #     w.setFixedWidth(350)
-        #     w.clicked.connect(lambda: self.get_map_image(self.info_buttons.index(w)))
-        #     self.vbox.addWidget(w)
-
-        for i in range(len(self.info_buttons)):
-            self.info_buttons[i].setFixedWidth(350)
-            # TODO: maybe figure out why next line doesn't work
-            # self.info_buttons[i].clicked.connect(lambda: self.get_map_image(i))
-            self.vbox.addWidget(self.info_buttons[i])
-
-        self.vbox.setAlignment(Qt.AlignHCenter)
-        self.widget.setLayout(self.vbox)
+        self.v_scroll_layout.setAlignment(Qt.AlignHCenter)
+        self.widget.setLayout(self.v_scroll_layout)
 
         # Scroll Area Properties
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -74,7 +66,7 @@ class MainWindow(QMainWindow):
         self.scroll.setWidget(self.widget)
 
         self.photo = QLabel()
-        self.generate_map_image(self.eq_data[0])
+        self.download_map_image(self.eq_data[0])
         self.photo.setPixmap(QPixmap('temporal/map-0.png'))
 
         self.main_layout.addWidget(self.photo)
@@ -84,44 +76,28 @@ class MainWindow(QMainWindow):
 
         self.setGeometry(600, 100, 600, 600)
 
-        self.show_image()
+    def on_button_clicked(self, id):
+        for button in self.button_group.buttons():
+            if button is self.button_group.button(id):
+                print(f"Showing image {id}")
+                self.download_map_image(self.eq_data[id])
+                self.photo.setPixmap(QPixmap(f'temporal/map-{id}.png'))
 
-    def show_image(self):
-        self.info_buttons[0].clicked.connect(lambda: self.get_map_image(0))
-        self.info_buttons[1].clicked.connect(lambda: self.get_map_image(1))
-        self.info_buttons[2].clicked.connect(lambda: self.get_map_image(2))
-        self.info_buttons[3].clicked.connect(lambda: self.get_map_image(3))
-        self.info_buttons[4].clicked.connect(lambda: self.get_map_image(4))
-        self.info_buttons[5].clicked.connect(lambda: self.get_map_image(5))
-        self.info_buttons[6].clicked.connect(lambda: self.get_map_image(6))
-        self.info_buttons[7].clicked.connect(lambda: self.get_map_image(7))
-        self.info_buttons[8].clicked.connect(lambda: self.get_map_image(8))
-        self.info_buttons[9].clicked.connect(lambda: self.get_map_image(9))
-        self.info_buttons[10].clicked.connect(lambda: self.get_map_image(10))
-        self.info_buttons[11].clicked.connect(lambda: self.get_map_image(11))
-        self.info_buttons[12].clicked.connect(lambda: self.get_map_image(12))
-        self.info_buttons[13].clicked.connect(lambda: self.get_map_image(13))
-        self.info_buttons[14].clicked.connect(lambda: self.get_map_image(14))
-
-    def get_map_image(self, btn_index):
-        print(str(self.sender))
-        self.generate_map_image(self.eq_data[btn_index])
-        self.photo.setPixmap(QPixmap(f'temporal/map-{btn_index}.png'))
-
-    def generate_map_image(self, single_eq):
+    def download_map_image(self, single_eq):
         """Generate image from google maps static api using geo data from earthquake api"""
         lat = single_eq['Latitud']
         long = single_eq['Longitud']
-        btn_index = self.eq_data.index(single_eq)   # gets index of button pressed
+        btn_index = self.eq_data.index(single_eq)  # gets index of button pressed
         try:
             os.mkdir(self.dir_name)
             print("Directory ", self.dir_name, " Created ")
         except FileExistsError:
             print("Directory ", self.dir_name, " already exists")
-        if not os.path.isfile(f'temporal/map.png-{btn_index}'):
+        if not os.path.isfile(f'temporal/map-{btn_index}.png'):
             gmaps_api_url = 'https://maps.googleapis.com/maps/api/staticmap?'
-            url = f'{gmaps_api_url}center={lat},{long}&zoom=10&size=600x400&key={API_key}'
+            url = f'{gmaps_api_url}center={lat},{long}&zoom=8&size=600x400&key={API_key}'
             urllib.request.urlretrieve(url, f'temporal/map-{btn_index}.png')
+            print("file created")
         else:
             print('file already exists')
 
@@ -138,4 +114,10 @@ app = QApplication(sys.argv)
 window = MainWindow()
 window.show()
 
+
+def delete_temporal_dir():
+    shutil.rmtree('temporal')
+
+
+atexit.register(delete_temporal_dir)
 app.exec_()
