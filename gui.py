@@ -32,8 +32,6 @@ class MainWindow(QMainWindow):
         self.georef_label = QLabel("")
         self.refresh_button = QPushButton("Refresh")
 
-        self.refresh_button.clicked.connect(self.start_refresh())
-
         self.title_layout.addWidget(self.georef_label)
         self.title_layout.addWidget(self.refresh_button)
 
@@ -62,16 +60,19 @@ class MainWindow(QMainWindow):
 
         self.setGeometry(600, 100, 600, 700)
 
+        self.refresh_button.clicked.connect(self.refresh)
+
     def earthquake_api_call(self):
         """get info from the most recent earthquakes from api and work with it as json"""
         return requests.get('https://api.gael.cl/general/public/sismos').json()
 
     def first_image_start(self):
+        """Downloads and sets the map of the last earthquake and its reference"""
         self.download_map_image(0)
         self.photo.setPixmap(QPixmap('temporal/map-0.png'))
         self.reference_title(0)
 
-    def start_refresh(self):
+    def refresh(self):
         self.delete_temporal_dir()
         self.eq_data = self.earthquake_api_call()
         self.button_group = QButtonGroup()
@@ -106,6 +107,7 @@ class MainWindow(QMainWindow):
         self.scroll.setWidget(self.widget)
 
     def on_button_clicked(self, index):
+        """Gets index of button clicked and uses it to generate map and reference"""
         for button in self.button_group.buttons():
             if button is self.button_group.button(index):
                 print(f"Showing image {index}")
@@ -136,11 +138,16 @@ class MainWindow(QMainWindow):
             print('file already exists')
 
     def reference_title(self, id):
+        """Displays a reference for the current image"""
         reference = self.eq_data[id]["RefGeografica"]
         self.georef_label.setText(reference)
 
     def delete_temporal_dir(self):
-        shutil.rmtree(self.dir_name)
+        """Deletes 'temporal' Folder"""
+        try:
+            shutil.rmtree(self.dir_name)
+        except FileNotFoundError:
+            print("'temporal' directory not found")
 
 
 app = QApplication(sys.argv)
